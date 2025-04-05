@@ -5,9 +5,9 @@ function VictoryScreen() {
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-blue-100">
-      <h1 className="text-5xl font-bold mb-8">🏆 Victory!</h1>
+      <h1 className="text-6xl font-bold mb-8 text-blue-800">🏆 You Saved the Park!</h1>
       <button
-        className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 px-8 rounded-2xl text-2xl"
+        className="bg-blue-600 hover:bg-blue-700 text-white py-4 px-8 rounded-lg text-2xl"
         onClick={() => navigate("/")}
       >
         Play Again
