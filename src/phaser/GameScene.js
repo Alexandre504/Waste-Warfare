@@ -53,21 +53,26 @@ export default class GameScene extends Phaser.Scene {
     this.load.audio("vroom", "/assets/vroom.m4a");
     this.load.audio("munch", "/assets/munch.m4a");
     this.load.image("eater", "/assets/flytrap-mob-pixilart.png");
+    this.load.image("background", "/assets/background.png");
   }
 
   create() {
-    const graphics = this.add.graphics();
-    graphics.fillStyle(0x87CEFA, 1);
-    graphics.fillRect(0, 0, this.gridConfig.width, 80); // Menu area
-    graphics.fillStyle(0x7CFC00, 1);
-    graphics.fillRect(0, 80, this.gridConfig.width, this.gridConfig.height - 80); // Grid area
-    graphics.lineStyle(4, 0x228B22, 1);
-    graphics.beginPath();
-    graphics.moveTo(0, 80);
-    graphics.lineTo(this.gridConfig.width, 80);
-    graphics.strokePath();
+    //const graphics = this.add.graphics();
+    //graphics.fillStyle(0x87CEFA, 1);
+    //graphics.fillRect(0, 0, this.gridConfig.width, 80); // Menu area
+    //graphics.fillStyle(0x7CFC00, 1);
+    //graphics.fillRect(0, 80, this.gridConfig.width, this.gridConfig.height - 80); // Grid area
+    //graphics.lineStyle(4, 0x228B22, 1);
+    //graphics.beginPath();
+    //graphics.moveTo(0, 80);
+    //graphics.lineTo(this.gridConfig.width, 80);
+    //graphics.strokePath();
 
     this.sound.play('warning', { volume: 1 });
+    this.background = this.add.image(0, 0, "background").setOrigin(0, 0);
+    this.background.displayWidth = this.cameras.main.width;
+    this.background.displayHeight = this.cameras.main.height;
+    this.background.setDepth(-1); // Ensure the background is behind other elements
 
     // Create physics groups
     this.pollutionGroup = this.physics.add.group();
@@ -350,6 +355,14 @@ export default class GameScene extends Phaser.Scene {
         targets: turbine, angle: { from: -10, to: 10 },
         yoyo: true, repeat: 5, duration: 50,
       });
+
+      // Add this line to destroy the turbine after activation
+      const index = this.windTurbines.indexOf(turbine);
+      if (index > -1) {
+        this.windTurbines.splice(index, 1); // Remove from the array
+      }
+      turbine.destroy(); // Destroy the Phaser object
+
     } else {
         // If turbine already used, just destroy the single enemy that triggered it
          if (enemy && enemy.active) {
@@ -357,6 +370,7 @@ export default class GameScene extends Phaser.Scene {
          }
     }
   }
+
 
   hitEnemy(projectile, enemy) {
     if (!enemy || !enemy.active || !projectile || !projectile.active) return; // Defensive checks
