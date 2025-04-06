@@ -111,7 +111,18 @@ export default class GameScene extends Phaser.Scene {
     this.aaronMenuIcon.on('pointerdown', this.startAaronDrag, this);
 
     // Create the static Eater menu icon right next to Aaron
-    this.eaterMenuIcon = this.add.image(this.gridConfig.width / 2 + 50, 40, "eater").setScale(0.3).setInteractive();
+    this.eaterMenuIcon = this.add.image(this.gridConfig.width / 2 + 50, 40, "eater").setScale(1.5).setInteractive();
+    this.eaterPriceText = this.add.text(
+      this.gridConfig.width / 2 + 50,
+      70, // Positioned below the Eater icon
+      `$${this.aaronCost}`, // Assuming Eater costs the same as Aaron
+      {
+        fontSize: '16px',
+        fill: '#fff',
+        align: 'center',
+        backgroundColor: 'rgba(0, 0, 0, 0.5)'
+      }
+    ).setOrigin(0.5, 0);
     this.eaterMenuIcon.on('pointerdown', this.startEaterDrag, this);
 
     // Handle drag and drop
@@ -333,7 +344,7 @@ placeEaterOnGrid(pointerX, pointerY) {
       if (this.currentMoney >= this.aaronCost) {
         this.currentMoney -= this.aaronCost;
         this.updateMoneyText();
-        const eater = this.physics.add.sprite(centerX, snappedY, "eater").setScale(0.5);
+        const eater = this.physics.add.sprite(centerX, snappedY, "eater").setScale(2);
         eater.setImmovable(true);
         eater.setInteractive();
 
@@ -452,4 +463,6 @@ placeEaterOnGrid(pointerX, pointerY) {
     projectile.setVelocityX(200);
   }
 }
+
+
 
