@@ -13,26 +13,26 @@ export default class GameScene extends Phaser.Scene {
       cellHeight: 100,
     };
     this.laneYPositions = [100, 200, 300, 400, 500];
-    this.enemyHealth = 3;
+    this.enemyHealth = 4; // Increased from 3 for more challenge
     this.projectileDamage = 1;
     this.enemyPauseDuration = 1000; // Note: Not used for Eater pause
-    this.aaronDestroyDelay = 1500;
-    this.aaronCost = 50;
-    this.eaterCost = 75; // NEW: Separate cost for Eater
-    this.currentMoney = 200;
+    this.aaronDestroyDelay = 2000; // Increased from 1500
+    this.aaronCost = 75; // Increased from 50
+    this.eaterCost = 100; // Increased from 75
+    this.currentMoney = 150; // Reduced starting money
     this.moneyText = null;
-    this.moneyTickInterval = 3000;
+    this.moneyTickInterval = 2000; // Reduced from 3000 for better flow
     this.moneyTickTimer = null;
-    this.moneyPerTick = 25;
-    this.initialSpawnDelay = 2000;
-    this.minSpawnDelay = 500;
-    this.spawnRateIncreaseInterval = 10000;
-    this.spawnRateIncreaseFactor = 0.9;
+    this.moneyPerTick = 20; // Reduced from 25
+    this.initialSpawnDelay = 3000; // Increased from 2000 for easier start
+    this.minSpawnDelay = 800; // Increased from 500
+    this.spawnRateIncreaseInterval = 15000; // Increased from 10000
+    this.spawnRateIncreaseFactor = 0.95; // Changed from 0.9 for smoother scaling
     this.enemySpawnTimer = null;
     this.currentSpawnDelay = this.initialSpawnDelay;
-    this.enemySpeedIncreaseInterval = 15000;
-    this.enemySpeedIncreaseFactor = 1.1;
-    this.initialEnemySpeed = -100;
+    this.enemySpeedIncreaseInterval = 20000; // Increased from 15000
+    this.enemySpeedIncreaseFactor = 1.08; // Reduced from 1.1
+    this.initialEnemySpeed = -80; // Reduced from -100 for easier start
     this.currentEnemySpeed = this.initialEnemySpeed;
     this.aaronMenuIcon = null;
     this.aaronPriceText = null;
@@ -40,6 +40,72 @@ export default class GameScene extends Phaser.Scene {
     this.eaterPriceText = null; // NEW
     this.draggingAaron = null;
     this.draggingEater = null; // NEW
+    this.projectileSpeed = 250; // Increased projectile speed
+    this.minShootInterval = 1200; // Minimum time between shots
+    this.maxShootInterval = 2500; // Maximum time between shots
+
+    // Updated enemy types with larger sizes
+    this.enemyTypes = {
+        trashcan: {
+            key: 'trashcanEnemy',
+            health: 4,
+            speed: -80,
+            scale: 0.5  // Increased from 0.75
+        },
+        barrel: {
+            key: 'barrel',
+            health: 5,
+            speed: -50,
+            scale: 2  // Increased from 0.8
+        },
+        reactor: {
+            key: 'reactor',
+            health: 7,
+            speed: -50,
+            scale: 2  // Increased from 0.7
+        }
+    };
+
+    // Updated defender types with new units
+    this.defenderTypes = {
+        aaron: {
+            key: 'aaron',
+            cost: 75,
+            scale: 0.2,
+            shootInterval: [1200, 2500]
+        },
+        eater: {
+            key: 'eater',
+            cost: 100,
+            scale: 2,
+            eatCooldown: 4000
+        },
+        tree: {
+            key: 'tree',
+            cost: 100,
+            scale: 2,
+            moneyInterval: 5000,
+            moneyAmount: 25
+        },
+        poppy: {
+            key: 'poppy',
+            cost: 125,
+            scale: 2,
+            shootInterval: 2000,
+            shootRange: 300,
+            projectileDamage: 2
+        }
+    };
+
+    // New properties
+    this.treeGroup = null;
+    this.poppyGroup = null;
+    this.treeMenuIcon = null;
+    this.treePriceText = null;
+    this.poppyMenuIcon = null;
+    this.poppyPriceText = null;
+    this.draggingTree = null;
+    this.draggingPoppy = null;
   }
 
   preload() {
@@ -54,20 +120,17 @@ export default class GameScene extends Phaser.Scene {
     this.load.audio("munch", "/assets/munch.m4a");
     this.load.image("eater", "/assets/flytrap-mob-pixilart.png");
     this.load.image("background", "/assets/background.png");
+
+    // Load new enemy assets
+    this.load.image("barrel", "/assets/barrel-mob-pixilart.png");
+    this.load.image("reactor", "/assets/nukereactor-pixilart.png");
+    
+    // Load new defender assets
+    this.load.image("tree", "/assets/tree-pixilart.png");
+    this.load.image("poppy", "/assets/poppy-pixilart.png");
   }
 
   create() {
-    //const graphics = this.add.graphics();
-    //graphics.fillStyle(0x87CEFA, 1);
-    //graphics.fillRect(0, 0, this.gridConfig.width, 80); // Menu area
-    //graphics.fillStyle(0x7CFC00, 1);
-    //graphics.fillRect(0, 80, this.gridConfig.width, this.gridConfig.height - 80); // Grid area
-    //graphics.lineStyle(4, 0x228B22, 1);
-    //graphics.beginPath();
-    //graphics.moveTo(0, 80);
-    //graphics.lineTo(this.gridConfig.width, 80);
-    //graphics.strokePath();
-
     this.sound.play('warning', { volume: 1 });
     this.background = this.add.image(0, 0, "background").setOrigin(0, 0);
     this.background.displayWidth = this.cameras.main.width;
@@ -80,6 +143,8 @@ export default class GameScene extends Phaser.Scene {
     this.aaronGroup = this.physics.add.group({ immovable: true }); // Aarons don't move
     this.projectileGroup = this.physics.add.group();
     this.eaterGroup = this.physics.add.group({ immovable: true }); // NEW: Eaters don't move
+    this.treeGroup = this.physics.add.group({ immovable: true });
+    this.poppyGroup = this.physics.add.group({ immovable: true });
 
     this.laneYPositions = [130, 230, 330, 430, 530]; // Adjusted Y positions
 
@@ -137,16 +202,41 @@ export default class GameScene extends Phaser.Scene {
         { fontSize: '16px', fill: '#fff', align: 'center', backgroundColor: 'rgba(0, 0, 0, 0.5)' }
     ).setOrigin(0.5, 0);
 
-    // --- Drag Handlers ---
-    // Shared pointerup for stopping any drag
+    // Tree Icon
+    this.treeMenuIcon = this.add.image(this.gridConfig.width / 2 + 90, 40, "tree")
+        .setScale(0.4)
+        .setInteractive();
+    this.treeMenuIcon.on('pointerdown', this.startTreeDrag, this);
+    this.treePriceText = this.add.text(
+        this.treeMenuIcon.x, 70,
+        `$${this.defenderTypes.tree.cost}`,
+        { fontSize: '16px', fill: '#fff', align: 'center', backgroundColor: 'rgba(0, 0, 0, 0.5)' }
+    ).setOrigin(0.5, 0);
+
+    // Poppy Icon
+    this.poppyMenuIcon = this.add.image(this.gridConfig.width / 2 + 150, 40, "poppy")
+        .setScale(0.3)
+        .setInteractive();
+    this.poppyMenuIcon.on('pointerdown', this.startPoppyDrag, this);
+    this.poppyPriceText = this.add.text(
+        this.poppyMenuIcon.x, 70,
+        `$${this.defenderTypes.poppy.cost}`,
+        { fontSize: '16px', fill: '#fff', align: 'center', backgroundColor: 'rgba(0, 0, 0, 0.5)' }
+    ).setOrigin(0.5, 0);
+
+    // Add to pointer handlers
     this.input.on('pointerup', (pointer) => {
         this.stopAaronDrag(pointer);
-        this.stopEaterDrag(pointer); // Call stop for eater too
+        this.stopEaterDrag(pointer);
+        this.stopTreeDrag(pointer);
+        this.stopPoppyDrag(pointer);
     });
-    // Specific move handlers needed if visual feedback differs
+
     this.input.on('pointermove', (pointer) => {
         this.updateAaronDrag(pointer);
-        this.updateEaterDrag(pointer); // Call update for eater too
+        this.updateEaterDrag(pointer);
+        this.updateTreeDrag(pointer);
+        this.updatePoppyDrag(pointer);
     });
 
     // Money Display
@@ -225,17 +315,76 @@ export default class GameScene extends Phaser.Scene {
     }
   }
 
+  startTreeDrag(pointer) {
+    if (this.draggingAaron || this.draggingEater || this.draggingTree || this.draggingPoppy) return;
+    if (this.currentMoney >= this.defenderTypes.tree.cost) {
+        this.draggingTree = this.add.image(pointer.x, pointer.y, "tree")
+            .setScale(this.defenderTypes.tree.scale)
+            .setAlpha(0.7)
+            .setDepth(101);
+    }
+  }
+
+  updateTreeDrag(pointer) {
+    if (this.draggingTree) {
+        this.draggingTree.x = pointer.x;
+        this.draggingTree.y = pointer.y;
+    }
+  }
+
+  stopTreeDrag(pointer) {
+    if (this.draggingTree) {
+        if (pointer.y > 80) {
+            this.placeTreeOnGrid(pointer.x, pointer.y);
+        }
+        this.draggingTree.destroy();
+        this.draggingTree = null;
+    }
+  }
+
+  startPoppyDrag(pointer) {
+    if (this.draggingAaron || this.draggingEater || this.draggingTree || this.draggingPoppy) return;
+    if (this.currentMoney >= this.defenderTypes.poppy.cost) {
+        this.draggingPoppy = this.add.image(pointer.x, pointer.y, "poppy")
+            .setScale(this.defenderTypes.poppy.scale)
+            .setAlpha(0.7)
+            .setDepth(101);
+    }
+  }
+
+  updatePoppyDrag(pointer) {
+    if (this.draggingPoppy) {
+        this.draggingPoppy.x = pointer.x;
+        this.draggingPoppy.y = pointer.y;
+    }
+  }
+
+  stopPoppyDrag(pointer) {
+    if (this.draggingPoppy) {
+        if (pointer.y > 80) {
+            this.placePoppyOnGrid(pointer.x, pointer.y);
+        }
+        this.draggingPoppy.destroy();
+        this.draggingPoppy = null;
+    }
+  }
 
   // --- Placement Functions ---
 
   placeAaronOnGrid(pointerX, pointerY) {
-    // Calculate grid position (adjusting for menu height)
     const gridX = Math.floor(pointerX / this.gridConfig.cellWidth);
     const gridY = Math.floor((pointerY - 80) / this.gridConfig.cellHeight);
     const centerX = gridX * this.gridConfig.cellWidth + this.gridConfig.cellWidth / 2;
     const snappedY = gridY * this.gridConfig.cellHeight + this.gridConfig.cellHeight / 2 + 80;
 
-    // Check bounds and if money is sufficient
+    // Check if position is occupied
+    const isOccupied = this.checkGridOccupied(centerX, snappedY);
+    if (isOccupied) {
+        console.log("Space already occupied!");
+        return;
+    }
+
+    // Rest of your existing placement code
     if (snappedY >= 80 && snappedY <= this.gridConfig.height) {
       if (this.currentMoney >= this.aaronCost) {
         this.currentMoney -= this.aaronCost;
@@ -246,7 +395,7 @@ export default class GameScene extends Phaser.Scene {
         const aaronId = Phaser.Utils.String.UUID(); // Unique ID for tracking
         aaron.setData('id', aaronId);
         // aaron.body.setImmovable(true); // Group handles this now
-        aaron.nextShootTime = this.time.now + Phaser.Math.Between(1000, 3000); // Randomize first shot
+        aaron.nextShootTime = this.time.now + Phaser.Math.Between(this.minShootInterval, this.maxShootInterval); // Randomize first shot
         aaron.isBeingEaten = false;
         aaron.eatingEnemy = null; // Which enemy is eating this Aaron
         aaron.destroyTimer = null; // Timer handle for destruction while being eaten
@@ -262,13 +411,19 @@ export default class GameScene extends Phaser.Scene {
   }
 
   placeEaterOnGrid(pointerX, pointerY) {
-    // Calculate grid position (adjusting for menu height)
     const gridX = Math.floor(pointerX / this.gridConfig.cellWidth);
     const gridY = Math.floor((pointerY - 80) / this.gridConfig.cellHeight);
     const centerX = gridX * this.gridConfig.cellWidth + this.gridConfig.cellWidth / 2;
     const snappedY = gridY * this.gridConfig.cellHeight + this.gridConfig.cellHeight / 2 + 80;
 
-    // Check bounds and if money is sufficient
+    // Check if position is occupied
+    const isOccupied = this.checkGridOccupied(centerX, snappedY);
+    if (isOccupied) {
+        console.log("Space already occupied!");
+        return;
+    }
+
+    // Rest of your existing placement code
     if (snappedY >= 80 && snappedY <= this.gridConfig.height) {
       if (this.currentMoney >= this.eaterCost) { // Check eaterCost
         this.currentMoney -= this.eaterCost; // Deduct eaterCost
@@ -280,7 +435,7 @@ export default class GameScene extends Phaser.Scene {
         // eater.setInteractive(); // Only needed if Eaters are clickable
 
         // Eater specific properties
-        eater.eatCooldown = 3000; // Cooldown in ms (3 seconds)
+        eater.eatCooldown = 4000; // Increased from 3000 for balance
         eater.nextEatTime = this.time.now; // Can eat immediately after placement
 
         console.log('Placing Eater at', centerX, snappedY);
@@ -296,25 +451,99 @@ export default class GameScene extends Phaser.Scene {
     }
   }
 
+  placeTreeOnGrid(pointerX, pointerY) {
+    const gridX = Math.floor(pointerX / this.gridConfig.cellWidth);
+    const gridY = Math.floor((pointerY - 80) / this.gridConfig.cellHeight);
+    const centerX = gridX * this.gridConfig.cellWidth + this.gridConfig.cellWidth / 2;
+    const snappedY = gridY * this.gridConfig.cellHeight + this.gridConfig.cellHeight / 2 + 80;
+
+    if (this.checkGridOccupied(centerX, snappedY)) return;
+
+    if (snappedY >= 80 && snappedY <= this.gridConfig.height) {
+        if (this.currentMoney >= this.defenderTypes.tree.cost) {
+            this.currentMoney -= this.defenderTypes.tree.cost;
+            this.updateMoneyText();
+
+            const tree = this.treeGroup.create(centerX, snappedY, "tree")
+                .setScale(this.defenderTypes.tree.scale);
+            
+            // Set up money generation
+            tree.moneyTimer = this.time.addEvent({
+                delay: this.defenderTypes.tree.moneyInterval,
+                callback: () => {
+                    this.currentMoney += this.defenderTypes.tree.moneyAmount;
+                    this.updateMoneyText();
+                    
+                    // Visual feedback
+                    this.add.text(tree.x, tree.y - 20, `+$${this.defenderTypes.tree.moneyAmount}`, {
+                        fontSize: '16px',
+                        fill: '#00ff00'
+                    }).setDepth(100).setOrigin(0.5, 0)
+                    .setAlpha(1)
+                    .setData('created', Date.now());
+                },
+                callbackScope: this,
+                loop: true
+            });
+        }
+    }
+  }
+
+  placePoppyOnGrid(pointerX, pointerY) {
+    const gridX = Math.floor(pointerX / this.gridConfig.cellWidth);
+    const gridY = Math.floor((pointerY - 80) / this.gridConfig.cellHeight);
+    const centerX = gridX * this.gridConfig.cellWidth + this.gridConfig.cellWidth / 2;
+    const snappedY = gridY * this.gridConfig.cellHeight + this.gridConfig.cellHeight / 2 + 80;
+
+    if (this.checkGridOccupied(centerX, snappedY)) return;
+
+    if (snappedY >= 80 && snappedY <= this.gridConfig.height) {
+        if (this.currentMoney >= this.defenderTypes.poppy.cost) {
+            this.currentMoney -= this.defenderTypes.poppy.cost;
+            this.updateMoneyText();
+
+            const poppy = this.poppyGroup.create(centerX, snappedY, "poppy")
+                .setScale(this.defenderTypes.poppy.scale);
+            
+            poppy.nextShootTime = this.time.now;
+            poppy.range = this.defenderTypes.poppy.shootRange;
+        }
+    }
+  }
+
+  // Add this new helper method
+  checkGridOccupied(x, y) {
+    const tolerance = 10;
+    return this.aaronGroup.getChildren().some(aaron => 
+        Math.abs(aaron.x - x) < tolerance && Math.abs(aaron.y - y) < tolerance
+    ) || this.eaterGroup.getChildren().some(eater => 
+        Math.abs(eater.x - x) < tolerance && Math.abs(eater.y - y) < tolerance
+    ) || this.treeGroup.getChildren().some(tree => 
+        Math.abs(tree.x - x) < tolerance && Math.abs(tree.y - y) < tolerance
+    ) || this.poppyGroup.getChildren().some(poppy => 
+        Math.abs(poppy.x - x) < tolerance && Math.abs(poppy.y - y) < tolerance
+    );
+  }
+
 
   // --- Enemy Handling ---
 
-  spawnPollution() {
-    const lane = Phaser.Math.Between(0, 4);
-    const y = this.laneYPositions[lane];
-    const enemy = this.pollutionGroup.create(960, y, "trashcanEnemy").setScale(0.75);
+  // spawnPollution() {
+  //   const lane = Phaser.Math.Between(0, 4);
+  //   const y = this.laneYPositions[lane];
+  //   const enemy = this.pollutionGroup.create(960, y, "trashcanEnemy").setScale(0.75);
 
-    // Enemy properties
-    enemy.setVelocityX(this.currentEnemySpeed);
-    enemy.health = this.enemyHealth;
-    enemy.isPaused = false; // General paused state
-    enemy.pauseTimer = null; // Not used for Eater pause
-    enemy.originalVelocityX = this.currentEnemySpeed; // Store initial speed
-    enemy.eatingAaron = null; // Reference to the Aaron it's eating
-    enemy.pausedByEater = null; // NEW: Reference to the Eater that paused it
+  //   // Enemy properties
+  //   enemy.setVelocityX(this.currentEnemySpeed);
+  //   enemy.health = this.enemyHealth;
+  //   enemy.isPaused = false; // General paused state
+  //   enemy.pauseTimer = null; // Not used for Eater pause
+  //   enemy.originalVelocityX = this.currentEnemySpeed; // Store initial speed
+  //   enemy.eatingAaron = null; // Reference to the Aaron it's eating
+  //   enemy.pausedByEater = null; // NEW: Reference to the Eater that paused it
 
-    console.log('Spawning enemy:', enemy.texture.key, 'at', enemy.x, enemy.y);
-  }
+  //   console.log('Spawning enemy:', enemy.texture.key, 'at', enemy.x, enemy.y);
+  // }
 
   destroyEnemy(enemy) {
     if (!enemy || !enemy.active) return; // Check if enemy exists and is active
@@ -332,45 +561,62 @@ export default class GameScene extends Phaser.Scene {
 
     enemy.destroy();
   }
+  spawnPollution() {
+    const lane = Phaser.Math.Between(0, 4);
+    const y = this.laneYPositions[lane];
+    
+    // Randomly select enemy type
+    const enemyTypes = Object.values(this.enemyTypes);
+    const selectedType = enemyTypes[Phaser.Math.Between(0, enemyTypes.length - 1)];
+    
+    const enemy = this.pollutionGroup.create(960, y, selectedType.key)
+        .setScale(selectedType.scale);
 
+    // Enemy properties
+    enemy.setVelocityX(selectedType.speed * this.currentEnemySpeed / this.initialEnemySpeed);
+    enemy.health = selectedType.health;
+    enemy.isPaused = false;
+    enemy.pauseTimer = null;
+    enemy.originalVelocityX = enemy.body.velocity.x;
+    enemy.eatingAaron = null;
+    enemy.pausedByEater = null;
+    enemy.type = selectedType.key;
+
+    console.log('Spawning enemy:', enemy.type, 'at', enemy.x, enemy.y);
+  }
 
   // --- Collision/Overlap Handlers ---
 
   triggerTurbine(enemy, turbine) {
     if (!turbine.used) {
-      this.sound.play('vroom', { volume: 1 });
-      turbine.used = true;
-      turbine.setTint(0x999999); // Mark as used
+        this.sound.play('vroom', { volume: 1 });
+        turbine.used = true;
+        turbine.setTint(0x999999);
 
-      // Destroy all enemies in the same lane
-      this.pollutionGroup.children.iterate((child) => {
-        // Check if child exists and is in the same lane (approximate y)
-        if (child && child.active && Math.abs(child.y - turbine.y) < this.gridConfig.cellHeight / 2) {
-          this.destroyEnemy(child);
-        }
-      });
+        // Destroy all enemies in the same lane
+        this.pollutionGroup.children.iterate((child) => {
+            if (child && child.active && Math.abs(child.y - turbine.y) < this.gridConfig.cellHeight / 2) {
+                this.destroyEnemy(child);
+            }
+        });
 
-      // Visual feedback for turbine activation
-      this.tweens.add({
-        targets: turbine, angle: { from: -10, to: 10 },
-        yoyo: true, repeat: 5, duration: 50,
-      });
-
-      // Add this line to destroy the turbine after activation
-      const index = this.windTurbines.indexOf(turbine);
-      if (index > -1) {
-        this.windTurbines.splice(index, 1); // Remove from the array
-      }
-      turbine.destroy(); // Destroy the Phaser object
-
-    } else {
-        // If turbine already used, just destroy the single enemy that triggered it
-         if (enemy && enemy.active) {
-            this.destroyEnemy(enemy);
-         }
+        // Visual feedback and destroy turbine
+        this.tweens.add({
+            targets: turbine,
+            angle: { from: -10, to: 10 },
+            yoyo: true,
+            repeat: 5,
+            duration: 50,
+            onComplete: () => {
+                const index = this.windTurbines.indexOf(turbine);
+                if (index > -1) {
+                    this.windTurbines.splice(index, 1);
+                }
+                turbine.destroy();
+            }
+        });
     }
   }
-
 
   hitEnemy(projectile, enemy) {
     if (!enemy || !enemy.active || !projectile || !projectile.active) return; // Defensive checks
@@ -619,9 +865,9 @@ export default class GameScene extends Phaser.Scene {
         aaron.y,
         "projectile"
     ).setScale(1.5);
-    projectile.setVelocityX(200); // Set projectile speed
+    projectile.setVelocityX(this.projectileSpeed); // Updated projectile speed
     // Optional: Add timer to destroy projectile if it goes off-screen
-    projectile.lifespan = 3000; // Destroy after 3 seconds if it hits nothing
+    projectile.lifespan = 2500; // Reduced from 3000
      this.time.delayedCall(projectile.lifespan, () => {
          if(projectile.active) projectile.destroy();
      });
@@ -672,7 +918,7 @@ export default class GameScene extends Phaser.Scene {
           this.shootProjectile(aaron);
           this.sound.play('pew', { volume: 0.5 }); // Lower volume maybe
           // Set next shoot time (random interval)
-          aaron.nextShootTime = time + Phaser.Math.Between(1500, 3500);
+          aaron.nextShootTime = time + Phaser.Math.Between(this.minShootInterval, this.maxShootInterval);
         }
       }
       // Cleanup check: Destroy Aaron if its eatingEnemy becomes inactive (e.g., killed by turbine)
@@ -700,6 +946,53 @@ export default class GameScene extends Phaser.Scene {
              projectile.destroy();
          }
      });
+
+    // Poppy shooting logic
+    this.poppyGroup.children.iterate((poppy) => {
+        if (poppy && poppy.active && time > poppy.nextShootTime) {
+            // Find closest enemy within range
+            let closestEnemy = null;
+            let closestDistance = poppy.range;
+
+            this.pollutionGroup.children.iterate((enemy) => {
+                if (enemy && enemy.active) {
+                    const distance = Phaser.Math.Distance.Between(poppy.x, poppy.y, enemy.x, enemy.y);
+                    if (distance < closestDistance) {
+                        closestDistance = distance;
+                        closestEnemy = enemy;
+                    }
+                }
+            });
+
+            if (closestEnemy) {
+                const projectile = this.projectileGroup.create(poppy.x, poppy.y, "projectile")
+                    .setScale(1.5);
+                
+                const angle = Phaser.Math.Angle.Between(poppy.x, poppy.y, closestEnemy.x, closestEnemy.y);
+                const velocity = new Phaser.Math.Vector2();
+                velocity.setToPolar(angle, this.projectileSpeed);
+                
+                projectile.setVelocity(velocity.x, velocity.y);
+                projectile.damage = this.defenderTypes.poppy.projectileDamage;
+                
+                this.sound.play('pew', { volume: 0.3 });
+                poppy.nextShootTime = time + this.defenderTypes.poppy.shootInterval;
+            }
+        }
+    });
+
+    // Clean up floating money text
+    this.children.each((child) => {
+        if (child.type === 'Text' && child.getData('created')) {
+            const age = Date.now() - child.getData('created');
+            if (age > 1000) {
+                child.destroy();
+            } else {
+                child.y -= 0.5;
+                child.setAlpha(1 - (age / 1000));
+            }
+        }
+    });
   }
 
 }
