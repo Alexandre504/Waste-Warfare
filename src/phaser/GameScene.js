@@ -1,3 +1,4 @@
+
 export default class GameScene extends Phaser.Scene {
   constructor() {
     super({ key: "GameScene" });
@@ -33,6 +34,7 @@ export default class GameScene extends Phaser.Scene {
     this.initialEnemySpeed = -100;
     this.currentEnemySpeed = this.initialEnemySpeed;
     this.aaronMenuIcon = null;
+    this.aaronPriceText = null; // To hold the price text
     this.draggingAaron = null;
   }
 
@@ -104,6 +106,19 @@ export default class GameScene extends Phaser.Scene {
     // Create the static Aaron menu icon
     this.aaronMenuIcon = this.add.image(this.gridConfig.width / 2, 40, "aaron").setScale(0.3).setInteractive();
     this.aaronMenuIcon.on('pointerdown', this.startAaronDrag, this);
+
+    // Create the text for the Aaron's price
+    this.aaronPriceText = this.add.text(
+      this.gridConfig.width / 2,
+      70, // Positioned below the icon
+      `$${this.aaronCost}`,
+      {
+        fontSize: '16px',
+        fill: '#fff',
+        align: 'center',
+        backgroundColor: 'rgba(0, 0, 0, 0.5)'
+      }
+    ).setOrigin(0.5, 0); // Center the text horizontally
 
     this.input.on('pointerup', this.stopAaronDrag, this);
     this.input.on('pointermove', this.updateAaronDrag, this);
@@ -364,3 +379,4 @@ export default class GameScene extends Phaser.Scene {
     projectile.setVelocityX(200);
   }
 }
+
