@@ -1,29 +1,30 @@
 import { useEffect } from "react";
 import Phaser from "phaser";
 import GameScene from "../phaser/GameScene";
+import DefeatScene from "../phaser/DefeatScene"
 
 function GameCanvas() {
-  useEffect(() => {
-    const config = {
-      type: Phaser.AUTO,
-      width: 960,
-      height: 600,
-      parent: "game-container",
-      physics: {
-        default: "arcade",
-        arcade: { debug: false },
-      },
-      scene: [GameScene],
-    };
+useEffect(() => {
+const config = {
+type: Phaser.AUTO,
+width: 960,
+height: 600,
+parent: "game-container",
+physics: {
+default: "arcade",
+arcade: { debug: false },
+},
+scene: [GameScene, DefeatScene],
+};
 
-    const game = new Phaser.Game(config);
+const game = new Phaser.Game(config);
 
-    return () => {
-      game.destroy(true);
-    };
-  }, []);
+return () => {
+game.destroy(true);
+};
+}, []);
 
-  return <div id="game-container" className="w-full h-screen"></div>;
+return <div id="game-container" className="w-full h-screen"></div>;
 }
 
 export default GameCanvas;
