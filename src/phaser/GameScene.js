@@ -39,7 +39,7 @@ export default class GameScene extends Phaser.Scene {
   }
 
   preload() {
-    this.load.image("trashcanEnemy", "/assets/trashcanEnemy.png");
+    this.load.image("trashcanEnemy", "/assets/trashcanEnemy_walking.webp");
     this.load.image("windTurbine", "/assets/windTurbine.png");
     this.load.image("projectile", "/assets/projectile.png");
     this.load.audio("warning", "/assets/warning.m4a");
@@ -47,6 +47,8 @@ export default class GameScene extends Phaser.Scene {
     this.load.audio("deadSound", "/assets/dead.m4a");
     this.load.audio("pew", "/assets/pew.m4a");
     this.load.audio("vroom", "/assets/vroom.m4a");
+    this.load.audio("munch", "/assets/munch.m4a");
+    this.load.image("eater", "/assets/flytrap-mob-pixilart.png");
   }
 
   create() {
@@ -63,6 +65,7 @@ export default class GameScene extends Phaser.Scene {
 
     this.sound.play('warning', { volume: 1 });
 
+    
     this.pollutionGroup = this.physics.add.group();
     this.windTurbines = [];
     this.aaronGroup = this.physics.add.group();
@@ -106,6 +109,15 @@ export default class GameScene extends Phaser.Scene {
     // Create the static Aaron menu icon
     this.aaronMenuIcon = this.add.image(this.gridConfig.width / 2, 40, "aaron").setScale(0.3).setInteractive();
     this.aaronMenuIcon.on('pointerdown', this.startAaronDrag, this);
+
+    // Create the static Eater menu icon right next to Aaron
+    this.eaterMenuIcon = this.add.image(this.gridConfig.width / 2 + 50, 40, "eater").setScale(0.3).setInteractive();
+    this.eaterMenuIcon.on('pointerdown', this.startEaterDrag, this);
+
+    // Handle drag and drop
+    this.input.on('pointerup', this.stopEaterDrag, this);
+    this.input.on('pointermove', this.updateEaterDrag, this);
+
 
     // Create the text for the Aaron's price
     this.aaronPriceText = this.add.text(
@@ -204,7 +216,7 @@ export default class GameScene extends Phaser.Scene {
   spawnPollution() {
     const lane = Phaser.Math.Between(0, 4);
     const y = this.laneYPositions[lane];
-    const enemy = this.pollutionGroup.create(960, y, "trashcanEnemy").setScale(1.5);
+    const enemy = this.pollutionGroup.create(960, y, "trashcanEnemy").setScale(0.75);
     enemy.setVelocityX(this.currentEnemySpeed);
     enemy.health = this.enemyHealth;
     enemy.isPaused = false;
@@ -265,6 +277,18 @@ export default class GameScene extends Phaser.Scene {
     }
   }
 
+  eatEnemy(eater, enemy) {
+    if (!eater || !enemy) return;
+  
+    if (this.time.now >= eater.nextEatTime) {
+      this.destroyEnemy(enemy);
+      this.sound.play('munch', {volume: 1});
+      eater.nextEatTime = this.time.now + eater.eatCooldown;
+      console.log(`Eater at (${eater.x}, ${eater.y}) ate an enemy. Next eat available at ${eater.nextEatTime}`);
+    } else {
+      console.log(`Eater on cooldown. Ready again in ${Math.ceil((eater.nextEatTime - this.time.now) / 1000)}s`);
+    }
+  }
   hitEnemy(projectile, enemy) {
     if (!enemy || !projectile) return; // Defensive check
     projectile.destroy();
@@ -275,7 +299,56 @@ export default class GameScene extends Phaser.Scene {
       this.destroyEnemy(enemy);
     }
   }
+  startEaterDrag(pointer) {
+    if (this.currentMoney >= this.aaronCost) {  // Optional: Check if player has enough money
+        this.draggingEater = this.add.image(pointer.x, pointer.y, "eater").setScale(3);
+    } else {
+        console.log("Not enough money to place the Eater.");
+    }
+}
 
+updateEaterDrag(pointer) {
+    if (this.draggingEater) {
+        this.draggingEater.x = pointer.x;
+        this.draggingEater.y = pointer.y;
+    }
+}
+
+stopEaterDrag(pointer) {
+    if (this.draggingEater) {
+        this.placeEaterOnGrid(pointer.x, pointer.y);
+        this.draggingEater.destroy();
+        this.draggingEater = null;
+    }
+}
+
+placeEaterOnGrid(pointerX, pointerY) {
+  if (pointerY > 80) {
+    const gridX = Math.floor(pointerX / this.gridConfig.cellWidth);
+    const gridY = Math.floor((pointerY - 80) / this.gridConfig.cellHeight);
+    const centerX = gridX * this.gridConfig.cellWidth + this.gridConfig.cellWidth / 2;
+    const snappedY = gridY * this.gridConfig.cellHeight + this.gridConfig.cellHeight / 2 + 80;
+
+    if (snappedY >= 80 && snappedY <= this.gridConfig.height) {
+      if (this.currentMoney >= this.aaronCost) {
+        this.currentMoney -= this.aaronCost;
+        this.updateMoneyText();
+        const eater = this.physics.add.sprite(centerX, snappedY, "eater").setScale(0.5);
+        eater.setImmovable(true);
+        eater.setInteractive();
+
+        eater.eatCooldown = 3000; // Cooldown in ms (3 seconds)
+        eater.nextEatTime = this.time.now; // Can eat immediately
+
+        this.physics.add.overlap(eater, this.pollutionGroup, this.eatEnemy, null, this);
+
+        console.log('Placing Eater at', centerX, snappedY);
+      } else {
+        console.log("Not enough money to place the Eater.");
+      }
+    }
+  }
+}
   destroyEnemy(enemy) {
     if (!enemy) return; // Defensive check
     this.stopEatingAaron(enemy);
