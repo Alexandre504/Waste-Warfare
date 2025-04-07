@@ -85,7 +85,8 @@ export default class GameScene extends Phaser.Scene {
             cost: 100,
             scale: 2,
             moneyInterval: 5000,
-            moneyAmount: 25
+            moneyAmount: 25,
+            health: 100  // Add health property
         },
         poppy: {
             key: 'poppy',
@@ -93,7 +94,8 @@ export default class GameScene extends Phaser.Scene {
             scale: 2,
             shootInterval: 2000,
             shootRange: 300,
-            projectileDamage: 2
+            projectileDamage: 2,
+            health: 75  // Add health property
         }
     };
 
@@ -148,11 +150,26 @@ export default class GameScene extends Phaser.Scene {
 
     this.laneYPositions = [130, 230, 330, 430, 530]; // Adjusted Y positions
 
+    // Clear existing turbines array
+    this.windTurbines = [];
+
+    // Create turbines for each lane
     this.laneYPositions.forEach((y) => {
-      const turbine = this.physics.add.sprite(50, y, "windTurbine").setScale(2);
-      turbine.used = false;
-      this.windTurbines.push(turbine);
+        const turbine = this.physics.add.sprite(50, y, "windTurbine")
+            .setScale(2)
+            .setImmovable(true);
+        turbine.used = false;
+        this.windTurbines.push(turbine);
     });
+
+    // Add overlap for turbines
+    this.physics.add.overlap(
+        this.pollutionGroup,
+        this.windTurbines,
+        this.triggerTurbine,
+        null,
+        this
+    );
 
     this.gridConfig.cellHeight = this.laneYPositions[1] - this.laneYPositions[0];
     this.gridConfig.cellWidth = 80;
@@ -184,6 +201,48 @@ export default class GameScene extends Phaser.Scene {
     this.physics.add.collider(this.pollutionGroup, this.aaronGroup, this.handleEnemyAaronCollision, null, this);
     // NEW: Centralized overlap for Eaters and Enemies
     this.physics.add.overlap(this.eaterGroup, this.pollutionGroup, this.handleEaterEnemyOverlap, null, this);
+
+    // Add these collision handlers
+    this.physics.add.collider(this.pollutionGroup, this.treeGroup, (enemy, tree) => {
+        // Stop enemy when colliding with tree
+        enemy.setVelocityX(0);
+        enemy.isPaused = true;
+        
+        // Damage the tree
+        tree.health -= 1;
+        this.updateHealthBar(tree);
+        
+        // Destroy tree if health depleted
+        if (tree.health <= 0) {
+            if (tree.healthBar) tree.healthBar.destroy();
+            if (tree.moneyTimer) tree.moneyTimer.remove();
+            tree.destroy();
+            
+            // Resume enemy movement
+            enemy.isPaused = false;
+            enemy.setVelocityX(enemy.originalVelocityX);
+        }
+    });
+
+    this.physics.add.collider(this.pollutionGroup, this.poppyGroup, (enemy, poppy) => {
+        // Stop enemy when colliding with poppy
+        enemy.setVelocityX(0);
+        enemy.isPaused = true;
+        
+        // Damage the poppy
+        poppy.health -= 1;
+        this.updateHealthBar(poppy);
+        
+        // Destroy poppy if health depleted
+        if (poppy.health <= 0) {
+            if (poppy.healthBar) poppy.healthBar.destroy();
+            poppy.destroy();
+            
+            // Resume enemy movement
+            enemy.isPaused = false;
+            enemy.setVelocityX(enemy.originalVelocityX);
+        }
+    });
 
     // --- Menu Icons ---
     // Aaron Icon
@@ -467,6 +526,14 @@ export default class GameScene extends Phaser.Scene {
             const tree = this.treeGroup.create(centerX, snappedY, "tree")
                 .setScale(this.defenderTypes.tree.scale);
             
+            // Add health properties
+            tree.maxHealth = this.defenderTypes.tree.health;
+            tree.health = tree.maxHealth;
+            
+            // Create health bar
+            tree.healthBar = this.add.graphics();
+            this.updateHealthBar(tree);
+            
             // Set up money generation
             tree.moneyTimer = this.time.addEvent({
                 delay: this.defenderTypes.tree.moneyInterval,
@@ -505,6 +572,14 @@ export default class GameScene extends Phaser.Scene {
             const poppy = this.poppyGroup.create(centerX, snappedY, "poppy")
                 .setScale(this.defenderTypes.poppy.scale);
             
+            // Add health properties
+            poppy.maxHealth = this.defenderTypes.poppy.health;
+            poppy.health = poppy.maxHealth;
+            
+            // Create health bar
+            poppy.healthBar = this.add.graphics();
+            this.updateHealthBar(poppy);
+            
             poppy.nextShootTime = this.time.now;
             poppy.range = this.defenderTypes.poppy.shootRange;
         }
@@ -525,25 +600,22 @@ export default class GameScene extends Phaser.Scene {
     );
   }
 
+  updateHealthBar(plant) {
+    if (plant.healthBar) {
+        plant.healthBar.clear();
+        
+        // Background of health bar
+        plant.healthBar.fillStyle(0xff0000);
+        plant.healthBar.fillRect(plant.x - 25, plant.y - 40, 50, 5);
+        
+        // Health remaining
+        const healthWidth = Math.max(0, (plant.health / plant.maxHealth) * 50);
+        plant.healthBar.fillStyle(0x00ff00);
+        plant.healthBar.fillRect(plant.x - 25, plant.y - 40, healthWidth, 5);
+    }
+  }
 
   // --- Enemy Handling ---
-
-  // spawnPollution() {
-  //   const lane = Phaser.Math.Between(0, 4);
-  //   const y = this.laneYPositions[lane];
-  //   const enemy = this.pollutionGroup.create(960, y, "trashcanEnemy").setScale(0.75);
-
-  //   // Enemy properties
-  //   enemy.setVelocityX(this.currentEnemySpeed);
-  //   enemy.health = this.enemyHealth;
-  //   enemy.isPaused = false; // General paused state
-  //   enemy.pauseTimer = null; // Not used for Eater pause
-  //   enemy.originalVelocityX = this.currentEnemySpeed; // Store initial speed
-  //   enemy.eatingAaron = null; // Reference to the Aaron it's eating
-  //   enemy.pausedByEater = null; // NEW: Reference to the Eater that paused it
-
-  //   console.log('Spawning enemy:', enemy.texture.key, 'at', enemy.x, enemy.y);
-  // }
 
   destroyEnemy(enemy) {
     if (!enemy || !enemy.active) return; // Check if enemy exists and is active
@@ -588,34 +660,36 @@ export default class GameScene extends Phaser.Scene {
   // --- Collision/Overlap Handlers ---
 
   triggerTurbine(enemy, turbine) {
-    if (!turbine.used) {
-        this.sound.play('vroom', { volume: 1 });
-        turbine.used = true;
-        turbine.setTint(0x999999);
+    if (!turbine || !turbine.active || turbine.used) return;
+    
+    this.sound.play('vroom', { volume: 1 });
+    turbine.used = true;
 
-        // Destroy all enemies in the same lane
-        this.pollutionGroup.children.iterate((child) => {
-            if (child && child.active && Math.abs(child.y - turbine.y) < this.gridConfig.cellHeight / 2) {
-                this.destroyEnemy(child);
-            }
-        });
+    // Get the lane Y position
+    const laneY = turbine.y;
 
-        // Visual feedback and destroy turbine
-        this.tweens.add({
-            targets: turbine,
-            angle: { from: -10, to: 10 },
-            yoyo: true,
-            repeat: 5,
-            duration: 50,
-            onComplete: () => {
-                const index = this.windTurbines.indexOf(turbine);
-                if (index > -1) {
-                    this.windTurbines.splice(index, 1);
-                }
-                turbine.destroy();
+    // Destroy all enemies in the same lane
+    this.pollutionGroup.children.iterate((child) => {
+        if (child && child.active && Math.abs(child.y - laneY) < this.gridConfig.cellHeight / 2) {
+            this.destroyEnemy(child);
+        }
+    });
+
+    // Visual feedback animation
+    this.tweens.add({
+        targets: turbine,
+        angle: { from: 0, to: 360 },
+        duration: 500,
+        ease: 'Power2',
+        onComplete: () => {
+            // Remove from array and destroy
+            const index = this.windTurbines.indexOf(turbine);
+            if (index > -1) {
+                this.windTurbines.splice(index, 1);
             }
-        });
-    }
+            turbine.destroy();
+        }
+    });
   }
 
   hitEnemy(projectile, enemy) {
@@ -978,6 +1052,19 @@ export default class GameScene extends Phaser.Scene {
                 this.sound.play('pew', { volume: 0.3 });
                 poppy.nextShootTime = time + this.defenderTypes.poppy.shootInterval;
             }
+        }
+    });
+
+    // Update health bars positions
+    this.treeGroup.children.iterate((tree) => {
+        if (tree && tree.active) {
+            this.updateHealthBar(tree);
+        }
+    });
+    
+    this.poppyGroup.children.iterate((poppy) => {
+        if (poppy && poppy.active) {
+            this.updateHealthBar(poppy);
         }
     });
 
