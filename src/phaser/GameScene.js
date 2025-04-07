@@ -267,7 +267,96 @@ export default class GameScene extends Phaser.Scene {
       this.draggingAaron.y = pointer.y;
     }
   }
-
+  
+  triggerTurbine(enemy, turbine) {
+    if (!turbine || !turbine.active) {
+      console.log('Invalid turbine');
+      return;
+    }
+    
+    if (!turbine.used) {
+      turbine.used = true;
+      
+      // Visual feedback - flash the turbine before disappearing
+      this.tweens.add({
+        targets: turbine,
+        alpha: 0, // Fully transparent
+        duration: 200,
+        onComplete: () => {
+          turbine.setVisible(false);
+          turbine.alpha = 1; // Reset alpha in case you reuse this object later
+        }
+      });
+      
+      // Ensure we have a physics body before setting velocity
+      if (!turbine.body) {
+        this.physics.world.enable(turbine);
+      }
+      
+      // Get the Y position of the turbine's row with tolerance
+      const turbineRowY = turbine.y;
+      const rowTolerance = 5; // Allow small variation in Y position
+      
+      // Check if groups exist before trying to access them
+      let enemiesInRow = [];
+      if (this.pollutionGroup && this.pollutionGroup.getChildren) {
+        enemiesInRow = this.pollutionGroup.getChildren().filter(
+          e => e && e.active && Math.abs(e.y - turbineRowY) <= rowTolerance
+        );
+      }
+      
+      let projectilesInRow = [];
+      if (this.projectileGroup && this.projectileGroup.getChildren) {
+        projectilesInRow = this.projectileGroup.getChildren().filter(
+          p => p && p.active && Math.abs(p.y - turbineRowY) <= rowTolerance
+        );
+      }
+      
+      console.log(`Found ${enemiesInRow.length} enemies and ${projectilesInRow.length} projectiles in row`);
+      
+      // Make copies of the arrays for safe removal
+      const enemyCopy = [...enemiesInRow];
+      const projectileCopy = [...projectilesInRow];
+      
+      // Process enemies with individual timers
+      enemyCopy.forEach((enemyToDestroy, index) => {
+        this.time.delayedCall(index * 100, () => { // Stagger destruction by 100ms
+          if (enemyToDestroy && enemyToDestroy.active) {
+            this.destroyEnemy(enemyToDestroy);
+            console.log('Destroyed enemy in row');
+          }
+        }, null, this);
+      });
+      
+      // Process projectiles with individual timers
+      projectileCopy.forEach((projectileToDestroy, index) => {
+        this.time.delayedCall(index * 50, () => { // Stagger destruction by 50ms
+          if (projectileToDestroy && projectileToDestroy.active) {
+            projectileToDestroy.destroy();
+            console.log('Destroyed projectile in row');
+          }
+        }, null, this);
+      });
+      
+      // Add a sound effect for the turbine being triggered
+      this.sound.play('vroom', { volume: 1 });
+      console.log('Turbine activated and sweeping');
+      
+      // Actual destruction is delayed to allow invisible turbine's effects to complete
+      this.time.delayedCall(2000, () => {
+        if (turbine && turbine.active) {
+          turbine.destroy();
+          console.log('Turbine destroyed after effects completed');
+        }
+      }, null, this);
+    } else {
+      // If turbine was already used but somehow got triggered again
+      console.log('Turbine already used');
+    }
+    
+    // Do NOT destroy the turbine here, as it would happen immediately!
+    // Remove this line: turbine.destroy();
+  }
   stopAaronDrag(pointer) {
     if (this.draggingAaron) {
       // Try placing Aaron on the grid if pointer is in the valid area
@@ -450,6 +539,7 @@ export default class GameScene extends Phaser.Scene {
          console.log("Attempted to place Eater outside grid bounds.");
     }
   }
+  
 
   placeTreeOnGrid(pointerX, pointerY) {
     const gridX = Math.floor(pointerX / this.gridConfig.cellWidth);
@@ -587,37 +677,7 @@ export default class GameScene extends Phaser.Scene {
 
   // --- Collision/Overlap Handlers ---
 
-  triggerTurbine(enemy, turbine) {
-    if (!turbine.used) {
-        this.sound.play('vroom', { volume: 1 });
-        turbine.used = true;
-        turbine.setTint(0x999999);
-
-        // Destroy all enemies in the same lane
-        this.pollutionGroup.children.iterate((child) => {
-            if (child && child.active && Math.abs(child.y - turbine.y) < this.gridConfig.cellHeight / 2) {
-                this.destroyEnemy(child);
-            }
-        });
-
-        // Visual feedback and destroy turbine
-        this.tweens.add({
-            targets: turbine,
-            angle: { from: -10, to: 10 },
-            yoyo: true,
-            repeat: 5,
-            duration: 50,
-            onComplete: () => {
-                const index = this.windTurbines.indexOf(turbine);
-                if (index > -1) {
-                    this.windTurbines.splice(index, 1);
-                }
-                turbine.destroy();
-            }
-        });
-    }
-  }
-
+  
   hitEnemy(projectile, enemy) {
     if (!enemy || !enemy.active || !projectile || !projectile.active) return; // Defensive checks
 
